@@ -33,7 +33,7 @@ import orcDeath from '../assets/characters/orc/Orc-Death.png';
 const WORLD_WIDTH = 1600;
 const GROUND_HEIGHT = 64;
 const GROUND_BOTTOM = 4; // small gap at bottom (game area is already sized above bottom nav)
-const SPRITE_BOTTOM = GROUND_BOTTOM + GROUND_HEIGHT - 8;
+const SPRITE_BOTTOM = GROUND_BOTTOM - 2; // sprite frames have large bottom padding, so overlap ground
 
 // Building definitions
 const BUILDING_DEFS = [
@@ -69,7 +69,7 @@ const ORC_ANIMS = {
 };
 
 // Individual character with position and animation
-function Character({ x, anim, isEnemy, scale, flipOverride }) {
+function Character({ x, anim, isEnemy, scale, flipOverride, transitionDuration }) {
   const animData = isEnemy ? ORC_ANIMS[anim] : SOLDIER_ANIMS[anim];
   // Soldiers face right by default, orcs face left
   const flip = flipOverride !== undefined ? flipOverride : isEnemy;
@@ -81,7 +81,7 @@ function Character({ x, anim, isEnemy, scale, flipOverride }) {
         bottom: SPRITE_BOTTOM,
         left: x,
         zIndex: 20,
-        transition: 'left 0.3s ease-out',
+        transition: `left ${transitionDuration != null ? transitionDuration : 0.3}s ease-out`,
       }}
     >
       <SpriteSheet
@@ -304,7 +304,8 @@ export default function VillageScene({
               anim={unit.anim}
               isEnemy={unit.side === 'enemy'}
               scale={SPRITE_SCALE}
-              flipOverride={unit.side === 'enemy'}
+              flipOverride={unit.flipX != null ? unit.flipX : unit.side === 'enemy'}
+              transitionDuration={unit.transitionDuration}
             />
           ))
         ) : (

@@ -20,9 +20,7 @@ const ROUND_PAUSE = 1000;
 
 // Combat positioning
 const COMBAT_CENTER_X = 950;
-const SOLDIER_SPACING = 50;
-const ENEMY_SPACING = 50;
-const COMBAT_GAP = 80; // gap between front lines
+const COMBAT_ZONE_HALF = 180; // half-width of the melee zone
 
 const INITIAL_BARRACKS = {
   built: false,
@@ -47,57 +45,74 @@ function initialState() {
   };
 }
 
-// Calculate combat positions for units
-function calcCombatPositions(soldierCount, enemyCount) {
+// Generate chaotic melee positions where paired units are close together
+function calcChaosPositions(soldierCount, enemyCount) {
+  const totalPairs = Math.min(soldierCount, enemyCount);
   const soldierPositions = [];
   const enemyPositions = [];
 
-  // Soldiers on the left, enemies on the right
-  const frontLineX = COMBAT_CENTER_X - COMBAT_GAP / 2;
-  const enemyFrontX = COMBAT_CENTER_X + COMBAT_GAP / 2;
+  const ZONE_LEFT = COMBAT_CENTER_X - COMBAT_ZONE_HALF;
+  const ZONE_RIGHT = COMBAT_CENTER_X + COMBAT_ZONE_HALF;
+  const ZONE_WIDTH = ZONE_RIGHT - ZONE_LEFT;
 
-  for (let i = 0; i < soldierCount; i++) {
-    const row = Math.floor(i / 3);
-    const col = i % 3;
+  // Evenly space pair anchors then jitter for chaos
+  const pairAnchors = [];
+  for (let i = 0; i < totalPairs; i++) {
+    const baseX = totalPairs === 1
+      ? COMBAT_CENTER_X
+      : ZONE_LEFT + (i / (totalPairs - 1)) * ZONE_WIDTH;
+    pairAnchors.push(baseX + (Math.random() - 0.5) * 60);
+  }
+  // Shuffle so the ordering feels random
+  pairAnchors.sort(() => Math.random() - 0.5);
+
+  for (let i = 0; i < totalPairs; i++) {
+    const px = pairAnchors[i];
+    const gap = 30 + Math.random() * 20; // 30-50px between paired units
+    const soldierLeft = Math.random() > 0.5;
+
     soldierPositions.push({
-      x: frontLineX - row * SOLDIER_SPACING - 30,
-      y: col * 20 - 20,
+      x: soldierLeft ? px - gap / 2 : px + gap / 2,
+      // flipX: face toward the paired enemy
+      flipX: !soldierLeft,
+    });
+    enemyPositions.push({
+      x: soldierLeft ? px + gap / 2 : px - gap / 2,
+      flipX: soldierLeft,
     });
   }
 
-  for (let i = 0; i < enemyCount; i++) {
-    const row = Math.floor(i / 3);
-    const col = i % 3;
-    enemyPositions.push({
-      x: enemyFrontX + row * ENEMY_SPACING + 30,
-      y: col * 20 - 20,
-    });
+  // Extra units (ganging up) cluster near existing opponents
+  const moreSoldiers = soldierCount > enemyCount;
+  const extraCount = Math.abs(soldierCount - enemyCount);
+
+  for (let i = 0; i < extraCount; i++) {
+    const targetIdx = i % totalPairs;
+    if (moreSoldiers) {
+      const near = enemyPositions[targetIdx];
+      const offset = -(40 + Math.random() * 20);
+      soldierPositions.push({ x: near.x + offset, flipX: offset > 0 });
+    } else {
+      const near = soldierPositions[targetIdx];
+      const offset = 40 + Math.random() * 20;
+      enemyPositions.push({ x: near.x + offset, flipX: offset < 0 });
+    }
   }
 
   return { soldierPositions, enemyPositions };
 }
 
-// Starting march positions (soldiers from left, enemies from right edge)
+// Starting march positions — soldiers from village, enemies from far right
 function calcMarchStartPositions(soldierCount, enemyCount) {
   const soldierPositions = [];
   const enemyPositions = [];
 
   for (let i = 0; i < soldierCount; i++) {
-    const row = Math.floor(i / 3);
-    const col = i % 3;
-    soldierPositions.push({
-      x: 600 - row * SOLDIER_SPACING,
-      y: col * 20 - 20,
-    });
+    soldierPositions.push({ x: 100 + (i * 60) % 600 });
   }
 
   for (let i = 0; i < enemyCount; i++) {
-    const row = Math.floor(i / 3);
-    const col = i % 3;
-    enemyPositions.push({
-      x: 1300 + row * ENEMY_SPACING,
-      y: col * 20 - 20,
-    });
+    enemyPositions.push({ x: 1500 + i * 30 });
   }
 
   return { soldierPositions, enemyPositions };
@@ -143,9 +158,9 @@ export default function App() {
     const breakthrough = remainingEnemies.length;
 
     if (remainingEnemies.length === 0) {
-      finalLogs.push('=== VICTORY! All enemies defeated or routed! ===');
+      finalLogs.push({ type: 'outcome', result: 'victory' });
     } else if (remainingSoldiers.length === 0) {
-      finalLogs.push('=== DEFEAT! Your soldiers have fallen or retreated! ===');
+      finalLogs.push({ type: 'outcome', result: 'defeat' });
     }
 
     const enemiesGone = originalEnemies.length - remainingEnemies.length;
@@ -155,10 +170,10 @@ export default function App() {
 
     if (breakthrough > 0) {
       moraleLoss = breakthrough * ENEMY_BREAKTHROUGH_PENALTY.morale;
-      finalLogs.push(`${breakthrough} enemies broke through! Morale -${moraleLoss}`);
+      finalLogs.push({ type: 'breakthrough', count: breakthrough, moraleLoss });
     }
-    if (goldGain > 0) {
-      finalLogs.push(`Loot: +${goldGain} gold, +${moraleGain} morale from ${enemiesGone} enemies.`);
+    if (goldGain > 0 || moraleGain > 0) {
+      finalLogs.push({ type: 'loot', gold: goldGain, morale: moraleGain, kills: enemiesGone });
     }
 
     const allSurvivors = [...remainingSoldiers, ...retreatedSoldiers];
@@ -186,131 +201,164 @@ export default function App() {
   const runVisualCombat = useCallback((combatSoldiers, combatEnemies, allLogs, retreatedSoldiers) => {
     let roundNum = 0;
 
-    // Build initial unit visual states
-    function buildUnitStates(solds, enems, anim, positions) {
+    // Build unit visual states from positions
+    function buildUnitStates(solds, enems, anim, positions, transitionDuration) {
       const states = [];
       const { soldierPositions, enemyPositions } = positions;
 
       solds.forEach((s, i) => {
+        const pos = soldierPositions[i] || { x: 800 };
         states.push({
           id: s.id, side: 'soldier', hp: s.hp, maxHp: s.maxHp,
-          x: soldierPositions[i]?.x || 800, anim,
+          x: pos.x, anim,
+          flipX: pos.flipX,
+          transitionDuration: transitionDuration != null ? transitionDuration : 0.3,
         });
       });
       enems.forEach((e, i) => {
+        const pos = enemyPositions[i] || { x: 1100 };
         states.push({
           id: e.id, side: 'enemy', hp: e.hp, maxHp: e.maxHp,
-          x: enemyPositions[i]?.x || 1100, anim,
+          x: pos.x, anim,
+          flipX: pos.flipX,
+          transitionDuration: transitionDuration != null ? transitionDuration : 0.3,
         });
       });
       return states;
     }
 
-    function nextRound(currentSoldiers, currentEnemies, logs, retSoldiers) {
-      roundNum++;
-      logs = [...logs, `--- ROUND ${roundNum} ---`];
-
-      // Phase 1: March to combat positions
-      const startPositions = calcMarchStartPositions(currentSoldiers.length, currentEnemies.length);
-      const combatPositions = calcCombatPositions(currentSoldiers.length, currentEnemies.length);
-
-      // Show marching
-      let marchStates = buildUnitStates(currentSoldiers, currentEnemies, 'walk', startPositions);
+    // Fight → resolve sequence (shared by all rounds)
+    function doFight(currentSoldiers, currentEnemies, logs, retSoldiers, chaosPos) {
+      // Show attack animations at current chaos positions
+      let fightStates = buildUnitStates(currentSoldiers, currentEnemies, 'attack', chaosPos);
       setState(prev => ({
         ...prev,
-        combatVisuals: { phase: 'march', unitStates: marchStates },
-        combatLogs: logs,
+        combatVisuals: { phase: 'fight', unitStates: fightStates },
       }));
 
       combatTimerRef.current = setTimeout(() => {
-        // Arrive at combat positions
-        let arrivedStates = buildUnitStates(currentSoldiers, currentEnemies, 'idle', combatPositions);
+        // Resolve the round
+        const result = resolveRound(currentSoldiers, currentEnemies);
+        logs = [...logs, ...result.log];
+
+        const newRetSoldiers = [
+          ...retSoldiers,
+          ...result.soldiers.filter(s => result.retreatedSoldierIds.includes(s.id)),
+        ];
+
+        const remainingSoldiers = result.finalSoldiers || result.soldiers.filter(
+          s => s.hp > 0 && !result.retreatedSoldierIds.includes(s.id)
+        );
+        const remainingEnemies = result.finalEnemies || result.enemies.filter(
+          e => e.hp > 0 && !result.retreatedEnemyIds.includes(e.id)
+        );
+
+        // Show hurt/death at the same chaos positions
+        let resolveStates = [];
+        result.soldiers.forEach((s, i) => {
+          const pos = chaosPos.soldierPositions[i] || { x: 800 };
+          let anim = 'idle';
+          if (s.hp <= 0) anim = 'death';
+          else if (result.retreatedSoldierIds.includes(s.id)) anim = 'walk';
+          else if (s.hp < (currentSoldiers.find(cs => cs.id === s.id)?.hp || s.hp)) anim = 'hurt';
+          resolveStates.push({
+            id: s.id, side: 'soldier', hp: s.hp, maxHp: s.maxHp,
+            x: pos.x, anim, flipX: pos.flipX, transitionDuration: 0.3,
+          });
+        });
+        result.enemies.forEach((e, i) => {
+          const pos = chaosPos.enemyPositions[i] || { x: 1100 };
+          let anim = 'idle';
+          if (e.hp <= 0) anim = 'death';
+          else if (result.retreatedEnemyIds.includes(e.id)) anim = 'walk';
+          else if (e.hp < (currentEnemies.find(ce => ce.id === e.id)?.hp || e.hp)) anim = 'hurt';
+          resolveStates.push({
+            id: e.id, side: 'enemy', hp: e.hp, maxHp: e.maxHp,
+            x: pos.x, anim, flipX: pos.flipX, transitionDuration: 0.3,
+          });
+        });
+
         setState(prev => ({
           ...prev,
-          combatVisuals: { phase: 'fight', unitStates: arrivedStates },
+          combatVisuals: { phase: 'resolve', unitStates: resolveStates },
+          combatLogs: logs,
+          soldiers: [...remainingSoldiers, ...newRetSoldiers],
+          enemies: remainingEnemies,
         }));
 
         combatTimerRef.current = setTimeout(() => {
-          // Phase 2: Fight! Show attack animations
-          let fightStates = buildUnitStates(currentSoldiers, currentEnemies, 'attack', combatPositions);
+          if (remainingSoldiers.length === 0 || remainingEnemies.length === 0) {
+            combatTimerRef.current = setTimeout(() => {
+              finalizeCombat(remainingSoldiers, remainingEnemies, newRetSoldiers, combatEnemies, logs);
+            }, ROUND_PAUSE);
+            return;
+          }
+
+          // Next round with fresh chaos positions for survivors
+          combatTimerRef.current = setTimeout(() => {
+            nextRound(remainingSoldiers, remainingEnemies, logs, newRetSoldiers);
+          }, ROUND_PAUSE);
+        }, DEATH_ANIM_DURATION);
+
+      }, FIGHT_ANIM_DURATION);
+    }
+
+    function nextRound(currentSoldiers, currentEnemies, logs, retSoldiers) {
+      roundNum++;
+      logs = [...logs, { type: 'round', num: roundNum }];
+
+      // Generate chaotic melee positions
+      const chaosPos = calcChaosPositions(currentSoldiers.length, currentEnemies.length);
+
+      if (roundNum === 1) {
+        // First round: march from start positions to the melee
+        const startPositions = calcMarchStartPositions(currentSoldiers.length, currentEnemies.length);
+
+        // Place units at start positions instantly
+        let startStates = buildUnitStates(currentSoldiers, currentEnemies, 'walk', startPositions, 0);
+        setState(prev => ({
+          ...prev,
+          combatVisuals: { phase: 'march', unitStates: startStates },
+          combatLogs: logs,
+        }));
+
+        // After a tick, set destination with long transition so they walk smoothly
+        combatTimerRef.current = setTimeout(() => {
+          let walkStates = buildUnitStates(
+            currentSoldiers, currentEnemies, 'walk', chaosPos, MARCH_DURATION / 1000
+          );
           setState(prev => ({
             ...prev,
-            combatVisuals: { phase: 'fight', unitStates: fightStates },
+            combatVisuals: { phase: 'march', unitStates: walkStates },
           }));
 
+          // Wait for march to finish, then fight
           combatTimerRef.current = setTimeout(() => {
-            // Phase 3: Resolve the round logic
-            const result = resolveRound(currentSoldiers, currentEnemies);
-            logs = [...logs, ...result.log];
-
-            const newRetSoldiers = [
-              ...retSoldiers,
-              ...result.soldiers.filter(s => result.retreatedSoldierIds.includes(s.id)),
-            ];
-
-            const remainingSoldiers = result.finalSoldiers || result.soldiers.filter(
-              s => s.hp > 0 && !result.retreatedSoldierIds.includes(s.id)
-            );
-            const remainingEnemies = result.finalEnemies || result.enemies.filter(
-              e => e.hp > 0 && !result.retreatedEnemyIds.includes(e.id)
-            );
-
-            // Show hurt/death animations based on results
-            const resolvePositions = calcCombatPositions(
-              result.soldiers.length, result.enemies.length
-            );
-            let resolveStates = [];
-
-            result.soldiers.forEach((s, i) => {
-              let anim = 'idle';
-              if (s.hp <= 0) anim = 'death';
-              else if (result.retreatedSoldierIds.includes(s.id)) anim = 'walk';
-              else if (s.hp < (currentSoldiers.find(cs => cs.id === s.id)?.hp || s.hp)) anim = 'hurt';
-              resolveStates.push({
-                id: s.id, side: 'soldier', hp: s.hp, maxHp: s.maxHp,
-                x: resolvePositions.soldierPositions[i]?.x || 800, anim,
-              });
-            });
-
-            result.enemies.forEach((e, i) => {
-              let anim = 'idle';
-              if (e.hp <= 0) anim = 'death';
-              else if (result.retreatedEnemyIds.includes(e.id)) anim = 'walk';
-              else if (e.hp < (currentEnemies.find(ce => ce.id === e.id)?.hp || e.hp)) anim = 'hurt';
-              resolveStates.push({
-                id: e.id, side: 'enemy', hp: e.hp, maxHp: e.maxHp,
-                x: resolvePositions.enemyPositions[i]?.x || 1100, anim,
-              });
-            });
-
+            // Brief idle pause before attacking
+            let idleStates = buildUnitStates(currentSoldiers, currentEnemies, 'idle', chaosPos);
             setState(prev => ({
               ...prev,
-              combatVisuals: { phase: 'resolve', unitStates: resolveStates },
-              combatLogs: logs,
-              soldiers: [...remainingSoldiers, ...newRetSoldiers],
-              enemies: remainingEnemies,
+              combatVisuals: { phase: 'fight', unitStates: idleStates },
             }));
 
-            // Wait for hurt/death anims to play
             combatTimerRef.current = setTimeout(() => {
-              // Check if combat is over
-              if (remainingSoldiers.length === 0 || remainingEnemies.length === 0) {
-                combatTimerRef.current = setTimeout(() => {
-                  finalizeCombat(remainingSoldiers, remainingEnemies, newRetSoldiers, combatEnemies, logs);
-                }, ROUND_PAUSE);
-                return;
-              }
+              doFight(currentSoldiers, currentEnemies, logs, retSoldiers, chaosPos);
+            }, 500);
+          }, MARCH_DURATION);
+        }, 50);
+      } else {
+        // Subsequent rounds: already in melee, shuffle into new chaos positions
+        let idleStates = buildUnitStates(currentSoldiers, currentEnemies, 'idle', chaosPos, 0.5);
+        setState(prev => ({
+          ...prev,
+          combatVisuals: { phase: 'fight', unitStates: idleStates },
+          combatLogs: logs,
+        }));
 
-              // Pause then next round
-              combatTimerRef.current = setTimeout(() => {
-                nextRound(remainingSoldiers, remainingEnemies, logs, newRetSoldiers);
-              }, ROUND_PAUSE);
-            }, DEATH_ANIM_DURATION);
-
-          }, FIGHT_ANIM_DURATION);
-        }, 500); // brief pause at combat positions before attacking
-
-      }, MARCH_DURATION);
+        combatTimerRef.current = setTimeout(() => {
+          doFight(currentSoldiers, currentEnemies, logs, retSoldiers, chaosPos);
+        }, 600);
+      }
     }
 
     nextRound(combatSoldiers, combatEnemies, allLogs, retreatedSoldiers);
@@ -363,7 +411,7 @@ export default function App() {
           ...prev, cycle: newCycle, resources: res,
           soldiers: soldierList, cycleLogs: newLogs,
           enemies: raidEnemies, gamePhase: 'combat',
-          combatLogs: [`RAID: ${raidEnemies.length} enemies attack!`],
+          combatLogs: [{ type: 'raid', count: raidEnemies.length }],
           showCombatLog: true, showCycleLog: true,
         };
       } else {
