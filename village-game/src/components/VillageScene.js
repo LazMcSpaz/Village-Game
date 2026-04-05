@@ -33,7 +33,7 @@ import orcDeath from '../assets/characters/orc/Orc-Death.png';
 const WORLD_WIDTH = 1600;
 const GROUND_HEIGHT = 64;
 const GROUND_BOTTOM = 4; // small gap at bottom (game area is already sized above bottom nav)
-const SPRITE_BOTTOM = GROUND_BOTTOM + GROUND_HEIGHT - 8;
+const SPRITE_BOTTOM = GROUND_BOTTOM - 2; // sprite frames have large bottom padding, so overlap ground
 
 // Building definitions
 const BUILDING_DEFS = [
