@@ -158,9 +158,9 @@ export default function App() {
     const breakthrough = remainingEnemies.length;
 
     if (remainingEnemies.length === 0) {
-      finalLogs.push('=== VICTORY! All enemies defeated or routed! ===');
+      finalLogs.push({ type: 'outcome', result: 'victory' });
     } else if (remainingSoldiers.length === 0) {
-      finalLogs.push('=== DEFEAT! Your soldiers have fallen or retreated! ===');
+      finalLogs.push({ type: 'outcome', result: 'defeat' });
     }
 
     const enemiesGone = originalEnemies.length - remainingEnemies.length;
@@ -170,10 +170,10 @@ export default function App() {
 
     if (breakthrough > 0) {
       moraleLoss = breakthrough * ENEMY_BREAKTHROUGH_PENALTY.morale;
-      finalLogs.push(`${breakthrough} enemies broke through! Morale -${moraleLoss}`);
+      finalLogs.push({ type: 'breakthrough', count: breakthrough, moraleLoss });
     }
-    if (goldGain > 0) {
-      finalLogs.push(`Loot: +${goldGain} gold, +${moraleGain} morale from ${enemiesGone} enemies.`);
+    if (goldGain > 0 || moraleGain > 0) {
+      finalLogs.push({ type: 'loot', gold: goldGain, morale: moraleGain, kills: enemiesGone });
     }
 
     const allSurvivors = [...remainingSoldiers, ...retreatedSoldiers];
@@ -305,7 +305,7 @@ export default function App() {
 
     function nextRound(currentSoldiers, currentEnemies, logs, retSoldiers) {
       roundNum++;
-      logs = [...logs, `--- ROUND ${roundNum} ---`];
+      logs = [...logs, { type: 'round', num: roundNum }];
 
       // Generate chaotic melee positions
       const chaosPos = calcChaosPositions(currentSoldiers.length, currentEnemies.length);
@@ -411,7 +411,7 @@ export default function App() {
           ...prev, cycle: newCycle, resources: res,
           soldiers: soldierList, cycleLogs: newLogs,
           enemies: raidEnemies, gamePhase: 'combat',
-          combatLogs: [`RAID: ${raidEnemies.length} enemies attack!`],
+          combatLogs: [{ type: 'raid', count: raidEnemies.length }],
           showCombatLog: true, showCycleLog: true,
         };
       } else {

@@ -41,11 +41,11 @@ export function resolveRound(soldiers, enemies) {
   for (const pairing of pairings) {
     const { attackers, defenders, attackerSide } = pairing;
 
-    // Roll dice
+    // Roll dice (reroll ties)
     let attackerResult, defenderResult;
+    let ties = 0;
     let resolved = false;
 
-    // Reroll on ties
     while (!resolved) {
       attackerResult = rollMultipleD6(attackers.length);
       defenderResult = rollMultipleD6(defenders.length);
@@ -53,79 +53,74 @@ export function resolveRound(soldiers, enemies) {
       if (attackerResult.total !== defenderResult.total) {
         resolved = true;
       } else {
-        log.push(`  Tie (${attackerResult.total} vs ${defenderResult.total}) — rerolling`);
+        ties++;
       }
     }
 
     const attackerWins = attackerResult.total > defenderResult.total;
 
-    if (attackerSide === 'soldiers') {
-      const soldierNames = attackers.map(a => `Soldier #${a.id}`).join(', ');
-      const enemyNames = defenders.map(d => `Enemy #${d.id}`).join(', ');
+    // Determine which side is soldiers vs enemies
+    const soldierUnits = attackerSide === 'soldiers' ? attackers : defenders;
+    const enemyUnits = attackerSide === 'soldiers' ? defenders : attackers;
+    const soldierRoll = attackerSide === 'soldiers' ? attackerResult.total : defenderResult.total;
+    const enemyRoll = attackerSide === 'soldiers' ? defenderResult.total : attackerResult.total;
+    const soldiersWin = (attackerSide === 'soldiers') === attackerWins;
 
-      if (attackerWins) {
-        // Defenders (enemies) take 1 damage each
-        for (const def of defenders) {
-          def.hp -= 1;
-          log.push(`${soldierNames} rolled ${attackerResult.total} vs ${enemyNames} rolled ${defenderResult.total} → Enemy #${def.id} takes 1 damage (${def.hp} HP left)`);
-        }
-      } else {
-        // Attackers (soldiers) take 1 damage each
-        for (const atk of attackers) {
-          atk.hp -= 1;
-          log.push(`${soldierNames} rolled ${attackerResult.total} vs ${enemyNames} rolled ${defenderResult.total} → Soldier #${atk.id} takes 1 damage (${atk.hp} HP left)`);
-        }
+    // Apply damage
+    const hits = [];
+    if (soldiersWin) {
+      for (const e of enemyUnits) {
+        e.hp -= 1;
+        hits.push({ side: 'enemy', id: e.id, hp: e.hp, maxHp: e.maxHp });
       }
     } else {
-      // attackerSide === 'enemies'
-      const enemyNames = attackers.map(a => `Enemy #${a.id}`).join(', ');
-      const soldierNames = defenders.map(d => `Soldier #${d.id}`).join(', ');
-
-      if (attackerWins) {
-        for (const def of defenders) {
-          def.hp -= 1;
-          log.push(`${enemyNames} rolled ${attackerResult.total} vs ${soldierNames} rolled ${defenderResult.total} → Soldier #${def.id} takes 1 damage (${def.hp} HP left)`);
-        }
-      } else {
-        for (const atk of attackers) {
-          atk.hp -= 1;
-          log.push(`${enemyNames} rolled ${attackerResult.total} vs ${soldierNames} rolled ${defenderResult.total} → Enemy #${atk.id} takes 1 damage (${atk.hp} HP left)`);
-        }
+      for (const s of soldierUnits) {
+        s.hp -= 1;
+        hits.push({ side: 'soldier', id: s.id, hp: s.hp, maxHp: s.maxHp });
       }
     }
+
+    log.push({
+      type: 'duel',
+      soldiers: soldierUnits.map(s => s.id),
+      enemies: enemyUnits.map(e => e.id),
+      soldierRoll,
+      enemyRoll,
+      soldiersWin,
+      ties,
+      hits,
+    });
   }
 
-  // Remove dead units
+  // Check for dead units
   const deadSoldiers = updatedSoldiers.filter(s => s.hp <= 0);
   const deadEnemies = updatedEnemies.filter(e => e.hp <= 0);
 
   for (const ds of deadSoldiers) {
-    log.push(`Soldier #${ds.id} has fallen!`);
+    log.push({ type: 'death', side: 'soldier', id: ds.id });
   }
   for (const de of deadEnemies) {
-    log.push(`Enemy #${de.id} has been defeated!`);
+    log.push({ type: 'death', side: 'enemy', id: de.id });
   }
 
   // Filter to alive for retreat check
   const remainingSoldiers = updatedSoldiers.filter(s => s.hp > 0);
   const remainingEnemies = updatedEnemies.filter(e => e.hp > 0);
 
-  // Check retreat for units that just won their pairing
-  // A unit retreats if: hp <= 2 AND its side does NOT outnumber enemy 2:1 or more
   const soldierCount = remainingSoldiers.length;
   const enemyCount = remainingEnemies.length;
 
   for (const s of remainingSoldiers) {
     if (s.hp <= RETREAT_HP_THRESHOLD && !(soldierCount >= enemyCount * 2)) {
       retreatedSoldierIds.push(s.id);
-      log.push(`Soldier #${s.id} retreats to the village (${s.hp} HP)`);
+      log.push({ type: 'retreat', side: 'soldier', id: s.id, hp: s.hp });
     }
   }
 
   for (const e of remainingEnemies) {
     if (e.hp <= RETREAT_HP_THRESHOLD && !(enemyCount >= soldierCount * 2)) {
       retreatedEnemyIds.push(e.id);
-      log.push(`Enemy #${e.id} retreats off the map edge`);
+      log.push({ type: 'retreat', side: 'enemy', id: e.id, hp: e.hp });
     }
   }
 
