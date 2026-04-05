@@ -1,6 +1,6 @@
 import React, { useRef, useEffect } from 'react';
 
-export default function CycleLog({ logs }) {
+export default function CycleLog({ logs, onClose }) {
   const logRef = useRef(null);
 
   useEffect(() => {
@@ -13,7 +13,10 @@ export default function CycleLog({ logs }) {
 
   return (
     <div style={styles.container}>
-      <div style={styles.header}>📜 Cycle Log</div>
+      <div style={styles.header}>
+        <span>📜 Cycle Log</span>
+        <button style={styles.closeBtn} onClick={onClose}>✕</button>
+      </div>
       <div ref={logRef} style={styles.log}>
         {logs.map((entry, i) => (
           <div key={i} style={{
@@ -47,11 +50,29 @@ const styles = {
     flexDirection: 'column',
   },
   header: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     padding: '8px 12px',
     borderBottom: '1px solid #8B6914',
     color: '#ffd700',
     fontWeight: 'bold',
     fontSize: '14px',
+  },
+  closeBtn: {
+    background: 'none',
+    border: '1px solid #8B6914',
+    borderRadius: '50%',
+    color: '#f0d48a',
+    width: 24,
+    height: 24,
+    cursor: 'pointer',
+    fontSize: '12px',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    lineHeight: 1,
+    padding: 0,
   },
   log: {
     padding: '8px',

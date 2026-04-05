@@ -1,4 +1,4 @@
-import React, { useRef, useEffect, useState, useCallback } from 'react';
+import React, { useRef, useEffect, useState, useCallback, useMemo } from 'react';
 import SpriteSheet from './SpriteSheet';
 
 // Environment assets
@@ -32,29 +32,30 @@ import orcDeath from '../assets/characters/orc/Orc-Death.png';
 // Scene dimensions
 const WORLD_WIDTH = 1600;
 const GROUND_HEIGHT = 64;
-// Building definitions positioned in the world
+const SPRITE_BOTTOM = GROUND_HEIGHT - 8;
+
+// Building definitions
 const BUILDING_DEFS = [
   { type: 'house', img: houseImg, x: 80, w: 80, h: 72 },
   { type: 'farm', img: farmImg, x: 220, w: 100, h: 64 },
   { type: 'market', img: marketImg, x: 400, w: 90, h: 70 },
   { type: 'tavern', img: tavernImg, x: 560, w: 90, h: 80 },
 ];
-
 const BARRACKS_DEF = { type: 'barracks', img: barracksImg, x: 740, w: 128, h: 96 };
 
-// Tree positions
 const TREE_POSITIONS = [30, 170, 340, 510, 680, 870, 1000, 1130, 1280, 1420];
 
-// Sprite config
 const SPRITE_SCALE = 1.5;
 const FRAME_SIZE = 100;
 
-// Soldier sprite data
+// Combat positioning
+const COMBAT_CENTER_X = 950;
+
 const SOLDIER_ANIMS = {
   idle: { src: soldierIdle, frames: 6, fps: 6 },
   walk: { src: soldierWalk, frames: 8, fps: 10 },
   attack: { src: soldierAttack, frames: 6, fps: 8 },
-  hurt: { src: soldierHurt, frames: 4, fps: 6 },
+  hurt: { src: soldierHurt, frames: 4, fps: 8 },
   death: { src: soldierDeath, frames: 4, fps: 4 },
 };
 
@@ -62,19 +63,46 @@ const ORC_ANIMS = {
   idle: { src: orcIdle, frames: 6, fps: 6 },
   walk: { src: orcWalk, frames: 8, fps: 10 },
   attack: { src: orcAttack, frames: 6, fps: 8 },
-  hurt: { src: orcHurt, frames: 4, fps: 6 },
+  hurt: { src: orcHurt, frames: 4, fps: 8 },
   death: { src: orcDeath, frames: 4, fps: 4 },
 };
 
-// Character component with walking movement
-function Character({ id, isEnemy, baseX, anim, scale }) {
+// Individual character with position and animation
+function Character({ x, anim, isEnemy, scale, flipOverride }) {
   const animData = isEnemy ? ORC_ANIMS[anim] : SOLDIER_ANIMS[anim];
+  // Soldiers face right by default, orcs face left
+  const flip = flipOverride !== undefined ? flipOverride : isEnemy;
+
+  return (
+    <div
+      style={{
+        position: 'absolute',
+        bottom: SPRITE_BOTTOM,
+        left: x,
+        zIndex: 20,
+        transition: 'left 0.3s ease-out',
+      }}
+    >
+      <SpriteSheet
+        src={animData.src}
+        frameWidth={FRAME_SIZE}
+        frameHeight={FRAME_SIZE}
+        frameCount={animData.frames}
+        fps={animData.fps}
+        scale={scale}
+        flipX={flip}
+        loop={anim !== 'death'}
+      />
+    </div>
+  );
+}
+
+// Patrolling character for idle soldiers
+function PatrolCharacter({ baseX, isEnemy, scale }) {
   const [walkOffset, setWalkOffset] = useState(0);
-  const dirRef = useRef(isEnemy ? -1 : 1);
+  const dirRef = useRef(1);
 
   useEffect(() => {
-    if (anim !== 'idle') return;
-    // Soldiers patrol back and forth
     const interval = setInterval(() => {
       setWalkOffset(prev => {
         const next = prev + dirRef.current * 0.5;
@@ -86,34 +114,23 @@ function Character({ id, isEnemy, baseX, anim, scale }) {
       });
     }, 50);
     return () => clearInterval(interval);
-  }, [anim]);
-
-  const facing = isEnemy ? true : (dirRef.current < 0);
+  }, []);
 
   return (
-    <div
-      style={{
-        position: 'absolute',
-        bottom: GROUND_HEIGHT - 8,
-        left: baseX + walkOffset,
-        zIndex: 20,
-      }}
-    >
-      <SpriteSheet
-        src={animData.src}
-        frameWidth={FRAME_SIZE}
-        frameHeight={FRAME_SIZE}
-        frameCount={animData.frames}
-        fps={animData.fps}
-        scale={scale}
-        flipX={facing}
-        loop={anim !== 'death'}
-      />
-    </div>
+    <Character
+      x={baseX + walkOffset}
+      anim="idle"
+      isEnemy={isEnemy}
+      scale={scale}
+      flipOverride={dirRef.current < 0}
+    />
   );
 }
 
-export default function VillageScene({ soldiers, enemies, barracksBuilt, combatActive }) {
+export default function VillageScene({
+  soldiers, enemies, barracksBuilt, combatActive,
+  combatVisuals, // { phase, unitStates } from App
+}) {
   const containerRef = useRef(null);
   const [scrollX, setScrollX] = useState(0);
   const [containerWidth, setContainerWidth] = useState(800);
@@ -158,7 +175,6 @@ export default function VillageScene({ soldiers, enemies, barracksBuilt, combatA
     isDragging.current = false;
   }, []);
 
-  // Wheel scroll
   const handleWheel = useCallback((e) => {
     setScrollX(prev => clampScroll(prev + e.deltaX + e.deltaY));
   }, [clampScroll]);
@@ -170,44 +186,43 @@ export default function VillageScene({ soldiers, enemies, barracksBuilt, combatA
     return () => el.removeEventListener('wheel', handleWheel);
   }, [handleWheel]);
 
-  // Calculate soldier positions - spread across village area
-  const soldierPositions = soldiers.map((s, i) => {
-    const spacing = 60;
-    const startX = 100;
-    return startX + (i * spacing) % 600;
-  });
+  // Idle soldier positions
+  const idleSoldierPositions = useMemo(() => {
+    return soldiers.map((s, i) => 100 + (i * 60) % 600);
+  }, [soldiers]);
 
-  // Calculate enemy positions - they come from the right
-  const combatZoneX = 900;
-  const enemyPositions = enemies.map((e, i) => {
-    return combatZoneX + i * 55;
-  });
+  // Determine combat area for off-screen arrows
+  const combatAreaX = combatVisuals ? combatVisuals.unitStates : null;
+  const allCombatX = useMemo(() => {
+    if (!combatAreaX) return [];
+    return combatAreaX.map(u => u.x);
+  }, [combatAreaX]);
 
-  // Determine if battle is off-screen
-  const battleMinX = combatActive && enemies.length > 0
-    ? Math.min(...enemyPositions, ...soldierPositions.slice(0, soldiers.length))
-    : 0;
-  const battleMaxX = combatActive && enemies.length > 0
-    ? Math.max(...enemyPositions)
-    : 0;
+  const battleMinX = combatActive && allCombatX.length > 0 ? Math.min(...allCombatX) : 0;
+  const battleMaxX = combatActive && allCombatX.length > 0 ? Math.max(...allCombatX) : 0;
+  const battleOffRight = combatActive && allCombatX.length > 0 && battleMaxX > scrollX + containerWidth - 50;
+  const battleOffLeft = combatActive && allCombatX.length > 0 && battleMinX < scrollX + 50;
 
-  const battleOffRight = combatActive && enemies.length > 0 && battleMaxX > scrollX + containerWidth;
-  const battleOffLeft = combatActive && enemies.length > 0 && battleMinX < scrollX;
-
-  // Scroll to battle helper
   const scrollToBattle = useCallback((direction) => {
     if (direction === 'right') {
-      setScrollX(clampScroll(battleMaxX - containerWidth + 100));
+      setScrollX(clampScroll(battleMaxX - containerWidth + 150));
     } else {
-      setScrollX(clampScroll(battleMinX - 100));
+      setScrollX(clampScroll(battleMinX - 150));
     }
   }, [battleMaxX, battleMinX, containerWidth, clampScroll]);
 
-  // Get buildings list
+  // Auto-scroll to combat when it starts
+  useEffect(() => {
+    if (combatActive && combatVisuals && combatVisuals.phase === 'march') {
+      setScrollX(clampScroll(COMBAT_CENTER_X - containerWidth / 2));
+    }
+  }, [combatActive, combatVisuals?.phase]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const buildings = [...BUILDING_DEFS];
-  if (barracksBuilt) {
-    buildings.push(BARRACKS_DEF);
-  }
+  if (barracksBuilt) buildings.push(BARRACKS_DEF);
+
+  // Determine what to render for characters
+  const inCombat = combatActive && combatVisuals && combatVisuals.unitStates;
 
   return (
     <div
@@ -221,9 +236,7 @@ export default function VillageScene({ soldiers, enemies, barracksBuilt, combatA
       onTouchMove={handlePointerMove}
       onTouchEnd={handlePointerUp}
     >
-      {/* === PARALLAX LAYERS === */}
-
-      {/* Sky - fixed background */}
+      {/* Sky */}
       <div style={{
         ...styles.layer,
         backgroundImage: `url(${skyImg})`,
@@ -232,7 +245,7 @@ export default function VillageScene({ soldiers, enemies, barracksBuilt, combatA
         zIndex: 0,
       }} />
 
-      {/* Mountains - slow parallax */}
+      {/* Mountains - parallax */}
       <div style={{
         ...styles.layer,
         bottom: GROUND_HEIGHT - 10,
@@ -245,32 +258,24 @@ export default function VillageScene({ soldiers, enemies, barracksBuilt, combatA
         zIndex: 1,
       }} />
 
-      {/* Trees - medium parallax */}
+      {/* Trees - parallax */}
       <div style={{
         ...styles.layer,
         zIndex: 2,
         transform: `translateX(${-scrollX * 0.5}px)`,
       }}>
         {TREE_POSITIONS.map((tx, i) => (
-          <img
-            key={i}
-            src={treeImg}
-            alt=""
-            draggable={false}
+          <img key={i} src={treeImg} alt="" draggable={false}
             style={{
-              position: 'absolute',
-              bottom: GROUND_HEIGHT - 4,
-              left: tx,
-              width: 48,
-              height: 80,
-              imageRendering: 'pixelated',
-              opacity: 0.7,
+              position: 'absolute', bottom: GROUND_HEIGHT - 4,
+              left: tx, width: 48, height: 80,
+              imageRendering: 'pixelated', opacity: 0.7,
             }}
           />
         ))}
       </div>
 
-      {/* === MAIN WORLD LAYER (scrolls 1:1) === */}
+      {/* Main world layer */}
       <div style={{
         ...styles.layer,
         transform: `translateX(${-scrollX}px)`,
@@ -279,70 +284,59 @@ export default function VillageScene({ soldiers, enemies, barracksBuilt, combatA
       }}>
         {/* Buildings */}
         {buildings.map((b, i) => (
-          <img
-            key={b.type + i}
-            src={b.img}
-            alt={b.type}
-            draggable={false}
+          <img key={b.type + i} src={b.img} alt={b.type} draggable={false}
             style={{
-              position: 'absolute',
-              bottom: GROUND_HEIGHT - 4,
-              left: b.x,
-              width: b.w,
-              height: b.h,
-              imageRendering: 'pixelated',
-              zIndex: 10,
+              position: 'absolute', bottom: GROUND_HEIGHT - 4,
+              left: b.x, width: b.w, height: b.h,
+              imageRendering: 'pixelated', zIndex: 10,
             }}
           />
         ))}
 
-        {/* Soldiers */}
-        {soldiers.map((s, i) => (
-          <Character
-            key={`s-${s.id}`}
-            id={s.id}
-            isEnemy={false}
-            baseX={soldierPositions[i] || 100}
-            anim={combatActive ? 'idle' : 'idle'}
-            scale={SPRITE_SCALE}
-          />
-        ))}
+        {/* === CHARACTERS === */}
+        {inCombat ? (
+          // Combat mode: render from visual state
+          combatVisuals.unitStates.map((unit) => (
+            <Character
+              key={`${unit.side}-${unit.id}`}
+              x={unit.x}
+              anim={unit.anim}
+              isEnemy={unit.side === 'enemy'}
+              scale={SPRITE_SCALE}
+              flipOverride={unit.side === 'enemy'}
+            />
+          ))
+        ) : (
+          // Idle mode: patrolling soldiers
+          soldiers.map((s, i) => (
+            <PatrolCharacter
+              key={`s-${s.id}`}
+              baseX={idleSoldierPositions[i] || 100}
+              isEnemy={false}
+              scale={SPRITE_SCALE}
+            />
+          ))
+        )}
 
-        {/* Enemies */}
-        {enemies.map((e, i) => (
-          <Character
-            key={`e-${e.id}`}
-            id={e.id}
-            isEnemy={true}
-            baseX={enemyPositions[i] || combatZoneX}
-            anim={combatActive ? 'idle' : 'idle'}
-            scale={SPRITE_SCALE}
-          />
-        ))}
-
-        {/* Combat zone indicator */}
-        {combatActive && (
+        {/* Combat banner */}
+        {combatActive && combatVisuals && (
           <div style={{
-            position: 'absolute',
-            top: 10,
-            left: combatZoneX - 50,
-            width: enemies.length * 55 + 100,
-            textAlign: 'center',
-            zIndex: 30,
+            position: 'absolute', top: 10,
+            left: COMBAT_CENTER_X - 120, width: 240,
+            textAlign: 'center', zIndex: 30,
           }}>
             <div style={styles.combatBanner}>
-              RAID IN PROGRESS
+              {combatVisuals.phase === 'march' ? 'ENEMIES APPROACHING' :
+               combatVisuals.phase === 'fight' ? 'COMBAT' :
+               combatVisuals.phase === 'resolve' ? 'RESOLVING...' : 'RAID IN PROGRESS'}
             </div>
           </div>
         )}
       </div>
 
-      {/* Ground - repeating tile, scrolls 1:1 */}
+      {/* Ground */}
       <div style={{
-        position: 'absolute',
-        bottom: 0,
-        left: 0,
-        right: 0,
+        position: 'absolute', bottom: 0, left: 0, right: 0,
         height: GROUND_HEIGHT,
         backgroundImage: `url(${groundImg})`,
         backgroundSize: '64px 64px',
@@ -352,38 +346,19 @@ export default function VillageScene({ soldiers, enemies, barracksBuilt, combatA
         zIndex: 6,
       }} />
 
-      {/* === OFF-SCREEN BATTLE ARROWS === */}
+      {/* Off-screen battle arrows */}
       {battleOffRight && (
-        <div
-          style={styles.arrowRight}
-          onClick={() => scrollToBattle('right')}
-        >
-          <img
-            src={battleArrowRight}
-            alt="Battle this way"
-            style={styles.arrowImg}
-            draggable={false}
-          />
-          <div style={styles.arrowPulse} />
+        <div style={styles.arrowRight} onClick={() => scrollToBattle('right')}>
+          <img src={battleArrowRight} alt="Battle →" style={styles.arrowImg} draggable={false} />
         </div>
       )}
-
       {battleOffLeft && (
-        <div
-          style={styles.arrowLeft}
-          onClick={() => scrollToBattle('left')}
-        >
-          <img
-            src={battleArrowLeft}
-            alt="Battle this way"
-            style={styles.arrowImg}
-            draggable={false}
-          />
-          <div style={styles.arrowPulse} />
+        <div style={styles.arrowLeft} onClick={() => scrollToBattle('left')}>
+          <img src={battleArrowLeft} alt="← Battle" style={styles.arrowImg} draggable={false} />
         </div>
       )}
 
-      {/* Scroll position indicator */}
+      {/* Scroll indicator */}
       <div style={styles.scrollBarTrack}>
         <div style={{
           ...styles.scrollBarThumb,
@@ -406,10 +381,7 @@ const styles = {
   },
   layer: {
     position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
+    top: 0, left: 0, right: 0, bottom: 0,
     pointerEvents: 'none',
   },
   combatBanner: {
@@ -426,54 +398,33 @@ const styles = {
   },
   arrowRight: {
     position: 'absolute',
-    right: 12,
-    top: '50%',
+    right: 12, top: '50%',
     transform: 'translateY(-50%)',
-    cursor: 'pointer',
-    zIndex: 80,
+    cursor: 'pointer', zIndex: 80,
     pointerEvents: 'auto',
     animation: 'bounceRight 1s infinite',
   },
   arrowLeft: {
     position: 'absolute',
-    left: 12,
-    top: '50%',
+    left: 12, top: '50%',
     transform: 'translateY(-50%)',
-    cursor: 'pointer',
-    zIndex: 80,
+    cursor: 'pointer', zIndex: 80,
     pointerEvents: 'auto',
     animation: 'bounceLeft 1s infinite',
   },
   arrowImg: {
-    width: 64,
-    height: 64,
+    width: 64, height: 64,
     imageRendering: 'pixelated',
     filter: 'drop-shadow(0 0 8px rgba(255, 50, 50, 0.8))',
   },
-  arrowPulse: {
-    position: 'absolute',
-    top: -4,
-    left: -4,
-    right: -4,
-    bottom: -4,
-    border: '2px solid rgba(255, 50, 50, 0.5)',
-    borderRadius: '50%',
-    animation: 'pulse 1s infinite',
-  },
   scrollBarTrack: {
     position: 'absolute',
-    bottom: 70,
-    left: '10%',
-    width: '80%',
-    height: 4,
+    bottom: 8, left: '10%', width: '80%', height: 4,
     background: 'rgba(0,0,0,0.3)',
-    borderRadius: 2,
-    zIndex: 70,
+    borderRadius: 2, zIndex: 70,
   },
   scrollBarThumb: {
-    position: 'absolute',
-    top: 0,
-    height: '100%',
+    position: 'absolute', top: 0, height: '100%',
     background: 'rgba(240, 212, 138, 0.5)',
     borderRadius: 2,
   },

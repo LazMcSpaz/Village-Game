@@ -1,6 +1,6 @@
 import React, { useRef, useEffect } from 'react';
 
-export default function CombatLog({ logs, combatActive, soldiers, enemies }) {
+export default function CombatLog({ logs, combatActive, soldiers, enemies, onClose }) {
   const logRef = useRef(null);
 
   useEffect(() => {
@@ -15,11 +15,14 @@ export default function CombatLog({ logs, combatActive, soldiers, enemies }) {
     <div style={styles.container}>
       <div style={styles.header}>
         <span>⚔️ Combat Log</span>
-        {combatActive && (
-          <span style={styles.counts}>
-            Soldiers: {soldiers.filter(s => s.hp > 0).length} vs Enemies: {enemies.filter(e => e.hp > 0).length}
-          </span>
-        )}
+        <div style={styles.headerRight}>
+          {combatActive && (
+            <span style={styles.counts}>
+              Soldiers: {soldiers.filter(s => s.hp > 0).length} vs Enemies: {enemies.filter(e => e.hp > 0).length}
+            </span>
+          )}
+          <button style={styles.closeBtn} onClick={onClose}>✕</button>
+        </div>
       </div>
       <div ref={logRef} style={styles.log}>
         {logs.map((entry, i) => (
@@ -69,9 +72,29 @@ const styles = {
     fontWeight: 'bold',
     fontSize: '14px',
   },
+  headerRight: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
+  },
   counts: {
     fontSize: '12px',
     color: '#f0d48a',
+  },
+  closeBtn: {
+    background: 'none',
+    border: '1px solid #8B6914',
+    borderRadius: '50%',
+    color: '#f0d48a',
+    width: 24,
+    height: 24,
+    cursor: 'pointer',
+    fontSize: '12px',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    lineHeight: 1,
+    padding: 0,
   },
   log: {
     padding: '8px',

@@ -1,11 +1,12 @@
 import React from 'react';
 import { BARRACKS_BUILD_COST, SOLDIER_UPKEEP_COST, SOLDIER_PRODUCTION_COST } from '../game/constants';
 
-export default function BarracksMenu({ barracks, soldiers, resources, onBuild, onSetDesiredOutput, onSetMaxCap }) {
+export default function BarracksMenu({ barracks, soldiers, resources, onBuild, onSetDesiredOutput, onSetMaxCap, onClose }) {
   if (!barracks.built) {
     const affordable = resources.buildingMaterials >= BARRACKS_BUILD_COST;
     return (
       <div style={styles.panel}>
+        <button style={styles.closeBtn} onClick={onClose}>✕</button>
         <h2 style={styles.title}>Barracks</h2>
         <p style={styles.text}>The barracks is not yet built.</p>
         <p style={styles.text}>Cost: {BARRACKS_BUILD_COST} building materials</p>
@@ -35,6 +36,7 @@ export default function BarracksMenu({ barracks, soldiers, resources, onBuild, o
 
   return (
     <div style={styles.panel}>
+      <button style={styles.closeBtn} onClick={onClose}>✕</button>
       <h2 style={styles.title}>Barracks</h2>
 
       <div style={styles.stat}>
@@ -83,6 +85,7 @@ export default function BarracksMenu({ barracks, soldiers, resources, onBuild, o
 
 const styles = {
   panel: {
+    position: 'relative',
     background: 'rgba(42, 26, 14, 0.95)',
     border: '2px solid #8B6914',
     borderRadius: '12px',
@@ -90,6 +93,23 @@ const styles = {
     color: '#f0d48a',
     maxWidth: '400px',
     margin: '0 auto',
+  },
+  closeBtn: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    background: 'none',
+    border: '1px solid #8B6914',
+    borderRadius: '50%',
+    color: '#f0d48a',
+    width: 28,
+    height: 28,
+    cursor: 'pointer',
+    fontSize: '14px',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    lineHeight: 1,
   },
   title: {
     margin: '0 0 16px 0',
