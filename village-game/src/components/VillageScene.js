@@ -31,9 +31,8 @@ import orcDeath from '../assets/characters/orc/Orc-Death.png';
 
 // Scene dimensions
 const WORLD_WIDTH = 1600;
-const NAV_HEIGHT = 52;
 const GROUND_HEIGHT = 64;
-const GROUND_BOTTOM = NAV_HEIGHT; // raise ground above bottom nav
+const GROUND_BOTTOM = 4; // small gap at bottom (game area is already sized above bottom nav)
 const SPRITE_BOTTOM = GROUND_BOTTOM + GROUND_HEIGHT - 8;
 
 // Building definitions
@@ -429,7 +428,7 @@ const styles = {
   },
   scrollBarTrack: {
     position: 'absolute',
-    bottom: NAV_HEIGHT + 8, left: '10%', width: '80%', height: 4,
+    bottom: GROUND_BOTTOM + GROUND_HEIGHT + 8, left: '10%', width: '80%', height: 4,
     background: 'rgba(0,0,0,0.3)',
     borderRadius: 2, zIndex: 70,
   },

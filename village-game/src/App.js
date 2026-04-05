@@ -464,7 +464,7 @@ export default function App() {
 const styles = {
   app: {
     width: '100vw',
-    height: '100vh',
+    height: '100dvh',
     overflow: 'hidden',
     background: '#1a0e00',
     fontFamily: '"Segoe UI", sans-serif',
@@ -472,8 +472,7 @@ const styles = {
   gameArea: {
     position: 'relative',
     marginTop: '48px',
-    height: 'calc(100vh - 48px)',
-    paddingBottom: '52px',
+    height: 'calc(100dvh - 100px)',
     overflow: 'hidden',
   },
   menuOverlay: {
