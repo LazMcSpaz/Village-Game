@@ -31,8 +31,10 @@ import orcDeath from '../assets/characters/orc/Orc-Death.png';
 
 // Scene dimensions
 const WORLD_WIDTH = 1600;
+const NAV_HEIGHT = 52;
 const GROUND_HEIGHT = 64;
-const SPRITE_BOTTOM = GROUND_HEIGHT - 8;
+const GROUND_BOTTOM = NAV_HEIGHT; // raise ground above bottom nav
+const SPRITE_BOTTOM = GROUND_BOTTOM + GROUND_HEIGHT - 8;
 
 // Building definitions
 const BUILDING_DEFS = [
@@ -248,7 +250,7 @@ export default function VillageScene({
       {/* Mountains - parallax */}
       <div style={{
         ...styles.layer,
-        bottom: GROUND_HEIGHT - 10,
+        bottom: GROUND_BOTTOM + GROUND_HEIGHT - 10,
         height: 200,
         top: 'auto',
         backgroundImage: `url(${mountainsImg})`,
@@ -267,7 +269,7 @@ export default function VillageScene({
         {TREE_POSITIONS.map((tx, i) => (
           <img key={i} src={treeImg} alt="" draggable={false}
             style={{
-              position: 'absolute', bottom: GROUND_HEIGHT - 4,
+              position: 'absolute', bottom: GROUND_BOTTOM + GROUND_HEIGHT - 4,
               left: tx, width: 48, height: 80,
               imageRendering: 'pixelated', opacity: 0.7,
             }}
@@ -286,7 +288,7 @@ export default function VillageScene({
         {buildings.map((b, i) => (
           <img key={b.type + i} src={b.img} alt={b.type} draggable={false}
             style={{
-              position: 'absolute', bottom: GROUND_HEIGHT - 4,
+              position: 'absolute', bottom: GROUND_BOTTOM + GROUND_HEIGHT - 4,
               left: b.x, width: b.w, height: b.h,
               imageRendering: 'pixelated', zIndex: 10,
             }}
@@ -334,9 +336,17 @@ export default function VillageScene({
         )}
       </div>
 
-      {/* Ground */}
+      {/* Underground fill below ground */}
       <div style={{
         position: 'absolute', bottom: 0, left: 0, right: 0,
+        height: GROUND_BOTTOM,
+        background: '#2d1f12',
+        zIndex: 6,
+      }} />
+
+      {/* Ground */}
+      <div style={{
+        position: 'absolute', bottom: GROUND_BOTTOM, left: 0, right: 0,
         height: GROUND_HEIGHT,
         backgroundImage: `url(${groundImg})`,
         backgroundSize: '64px 64px',
@@ -419,7 +429,7 @@ const styles = {
   },
   scrollBarTrack: {
     position: 'absolute',
-    bottom: 8, left: '10%', width: '80%', height: 4,
+    bottom: NAV_HEIGHT + 8, left: '10%', width: '80%', height: 4,
     background: 'rgba(0,0,0,0.3)',
     borderRadius: 2, zIndex: 70,
   },
