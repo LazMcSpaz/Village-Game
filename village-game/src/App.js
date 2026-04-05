@@ -1,4 +1,5 @@
 import React, { useState, useCallback, useRef, useEffect } from 'react';
+import './App.css';
 import ResourceBar from './components/ResourceBar';
 import BottomNav from './components/BottomNav';
 import BarracksMenu from './components/BarracksMenu';
