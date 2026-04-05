@@ -69,7 +69,7 @@ const ORC_ANIMS = {
 };
 
 // Individual character with position and animation
-function Character({ x, anim, isEnemy, scale, flipOverride }) {
+function Character({ x, anim, isEnemy, scale, flipOverride, transitionDuration }) {
   const animData = isEnemy ? ORC_ANIMS[anim] : SOLDIER_ANIMS[anim];
   // Soldiers face right by default, orcs face left
   const flip = flipOverride !== undefined ? flipOverride : isEnemy;
@@ -81,7 +81,7 @@ function Character({ x, anim, isEnemy, scale, flipOverride }) {
         bottom: SPRITE_BOTTOM,
         left: x,
         zIndex: 20,
-        transition: 'left 0.3s ease-out',
+        transition: `left ${transitionDuration != null ? transitionDuration : 0.3}s ease-out`,
       }}
     >
       <SpriteSheet
@@ -304,7 +304,8 @@ export default function VillageScene({
               anim={unit.anim}
               isEnemy={unit.side === 'enemy'}
               scale={SPRITE_SCALE}
-              flipOverride={unit.side === 'enemy'}
+              flipOverride={unit.flipX != null ? unit.flipX : unit.side === 'enemy'}
+              transitionDuration={unit.transitionDuration}
             />
           ))
         ) : (
