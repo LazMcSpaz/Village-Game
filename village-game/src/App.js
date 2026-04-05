@@ -471,9 +471,9 @@ const styles = {
   },
   gameArea: {
     position: 'relative',
-    marginTop: '50px',
-    height: 'calc(100vh - 50px)',
-    paddingBottom: '56px',
+    marginTop: '48px',
+    height: 'calc(100vh - 48px)',
+    paddingBottom: '52px',
     overflow: 'hidden',
   },
   menuOverlay: {

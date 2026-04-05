@@ -14,7 +14,10 @@ export default function CycleLog({ logs, onClose }) {
   return (
     <div style={styles.container}>
       <div style={styles.header}>
-        <span>📜 Cycle Log</span>
+        <div style={styles.headerLeft}>
+          <span style={styles.headerIcon}>📜</span>
+          <span>Log</span>
+        </div>
         <button style={styles.closeBtn} onClick={onClose}>✕</button>
       </div>
       <div ref={logRef} style={styles.log}>
@@ -25,7 +28,10 @@ export default function CycleLog({ logs, onClose }) {
               ? '#ff6b6b'
               : entry.includes('produced')
                 ? '#51cf66'
-                : '#ccc',
+                : entry.includes('CYCLE')
+                  ? '#74c0fc'
+                  : '#aaa',
+            fontWeight: entry.includes('CYCLE') ? 'bold' : 'normal',
           }}>
             {entry}
           </div>
@@ -39,35 +45,44 @@ const styles = {
   container: {
     position: 'absolute',
     left: '10px',
-    top: '60px',
-    width: '300px',
-    maxHeight: 'calc(100vh - 160px)',
-    background: 'rgba(0, 0, 0, 0.85)',
-    border: '2px solid #8B6914',
+    top: '10px',
+    width: '280px',
+    maxHeight: 'calc(100vh - 130px)',
+    background: 'rgba(10, 6, 2, 0.9)',
+    border: '1px solid rgba(139, 105, 20, 0.4)',
     borderRadius: '8px',
     zIndex: 50,
     display: 'flex',
     flexDirection: 'column',
+    backdropFilter: 'blur(4px)',
   },
   header: {
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: '8px 12px',
-    borderBottom: '1px solid #8B6914',
-    color: '#ffd700',
-    fontWeight: 'bold',
+    padding: '8px 10px',
+    borderBottom: '1px solid rgba(139, 105, 20, 0.3)',
+    color: '#e8d5a0',
+    fontWeight: '600',
+    fontSize: '13px',
+  },
+  headerLeft: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '6px',
+  },
+  headerIcon: {
     fontSize: '14px',
   },
   closeBtn: {
     background: 'none',
-    border: '1px solid #8B6914',
-    borderRadius: '50%',
-    color: '#f0d48a',
-    width: 24,
-    height: 24,
+    border: '1px solid rgba(139, 105, 20, 0.3)',
+    borderRadius: '4px',
+    color: '#8a7a60',
+    width: 22,
+    height: 22,
     cursor: 'pointer',
-    fontSize: '12px',
+    fontSize: '11px',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
@@ -75,14 +90,14 @@ const styles = {
     padding: 0,
   },
   log: {
-    padding: '8px',
+    padding: '6px 8px',
     overflowY: 'auto',
-    maxHeight: '300px',
-    fontSize: '12px',
-    fontFamily: 'monospace',
+    maxHeight: '250px',
+    fontSize: '11px',
+    fontFamily: '"SF Mono", "Fira Code", monospace',
+    lineHeight: 1.5,
   },
   entry: {
-    padding: '2px 0',
-    borderBottom: '1px solid rgba(139, 105, 20, 0.2)',
+    padding: '1px 0',
   },
 };

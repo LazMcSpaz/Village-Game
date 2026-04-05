@@ -4,13 +4,13 @@ export default function GameOver({ cycle, onRestart }) {
   return (
     <div style={styles.overlay}>
       <div style={styles.panel}>
-        <h1 style={styles.title}>GAME OVER</h1>
         <div style={styles.skull}>💀</div>
+        <h1 style={styles.title}>GAME OVER</h1>
         <p style={styles.text}>Your village's morale has collapsed.</p>
-        <p style={styles.text}>The villagers have fled in despair.</p>
-        <div style={styles.stat}>
-          <span>Cycles Survived:</span>
-          <span style={styles.value}>{cycle}</span>
+        <p style={styles.textSub}>The villagers have fled in despair.</p>
+        <div style={styles.statBox}>
+          <span style={styles.statLabel}>Cycles Survived</span>
+          <span style={styles.statValue}>{cycle}</span>
         </div>
         <button style={styles.btn} onClick={onRestart}>
           Try Again
@@ -23,59 +23,75 @@ export default function GameOver({ cycle, onRestart }) {
 const styles = {
   overlay: {
     position: 'fixed',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    background: 'rgba(0, 0, 0, 0.9)',
+    top: 0, left: 0, right: 0, bottom: 0,
+    background: 'rgba(0, 0, 0, 0.92)',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
     zIndex: 1000,
   },
   panel: {
-    background: 'linear-gradient(180deg, #2a1a0e, #1a0e00)',
-    border: '3px solid #8B1A1A',
-    borderRadius: '16px',
-    padding: '40px',
+    background: 'rgba(10, 6, 2, 0.98)',
+    border: '1px solid rgba(180, 30, 30, 0.4)',
+    borderRadius: '12px',
+    padding: '40px 50px',
     textAlign: 'center',
-    color: '#f0d48a',
-    maxWidth: '400px',
-  },
-  title: {
-    color: '#ff4444',
-    fontSize: '36px',
-    margin: '0 0 10px 0',
-    textShadow: '2px 2px 4px rgba(255,0,0,0.5)',
+    color: '#e8d5a0',
+    maxWidth: '360px',
   },
   skull: {
-    fontSize: '64px',
-    margin: '10px 0',
+    fontSize: '48px',
+    marginBottom: '8px',
+    opacity: 0.9,
+  },
+  title: {
+    color: '#cc3333',
+    fontSize: '28px',
+    margin: '0 0 16px 0',
+    fontWeight: '700',
+    letterSpacing: '3px',
   },
   text: {
-    margin: '8px 0',
-    fontSize: '16px',
+    margin: '6px 0',
+    fontSize: '14px',
+    color: '#bbb',
   },
-  stat: {
+  textSub: {
+    margin: '4px 0 0',
+    fontSize: '12px',
+    color: '#777',
+  },
+  statBox: {
     display: 'flex',
-    justifyContent: 'center',
-    gap: '12px',
-    margin: '20px 0',
-    fontSize: '20px',
+    flexDirection: 'column',
+    alignItems: 'center',
+    margin: '24px 0',
+    padding: '12px',
+    background: 'rgba(139, 105, 20, 0.1)',
+    border: '1px solid rgba(139, 105, 20, 0.3)',
+    borderRadius: '8px',
   },
-  value: {
-    color: '#ffd700',
+  statLabel: {
+    fontSize: '10px',
+    textTransform: 'uppercase',
+    letterSpacing: '1px',
+    color: '#8a7a60',
+    marginBottom: '4px',
+  },
+  statValue: {
+    fontSize: '32px',
     fontWeight: 'bold',
+    color: '#f0d48a',
   },
   btn: {
-    marginTop: '16px',
-    background: '#5a3a1e',
-    border: '2px solid #8B6914',
-    borderRadius: '8px',
-    color: '#f0d48a',
+    background: 'linear-gradient(180deg, #2a7a2a, #1a5a1a)',
+    border: '1px solid #3a9a3a',
+    borderRadius: '6px',
+    color: '#fff',
     padding: '12px 32px',
     cursor: 'pointer',
     fontWeight: 'bold',
-    fontSize: '18px',
+    fontSize: '14px',
+    letterSpacing: '0.5px',
   },
 };
